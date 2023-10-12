@@ -230,9 +230,11 @@ public:
     ros::Publisher m_pub_render_rgb_pts;
     std::vector< std::shared_ptr <ros::Publisher> > m_pub_rgb_render_pointcloud_ptr_vec;
     std::mutex m_camera_data_mutex;
+    std::mutex m_mask_data_mutex;  // add
     double m_camera_start_ros_tim = -3e8;
-    std::deque<sensor_msgs::ImageConstPtr> m_queue_image_msg;
+    std::deque<sensor_msgs::ImageConstPtr> m_queue_image_msg; // useless
     std::deque<std::shared_ptr<Image_frame>> m_queue_image_with_pose;
+    std::deque<cv::Mat> m_queue_mask; // add
     std::list<std::shared_ptr<Image_frame>> g_image_vec;
     Eigen::Matrix3d g_cam_K;
     Eigen::Matrix<double, 5, 1> g_cam_dist;
@@ -294,7 +296,7 @@ public:
     void process_image(cv::Mat & image, double msg_time);
     void image_callback(const sensor_msgs::ImageConstPtr &msg);
     void image_comp_callback(const sensor_msgs::CompressedImageConstPtr &msg);
-    void image_mask_callback(const sensor_msgs::CompressedImageConstPtr &msg); // add
+    void image_mask_callback(const sensor_msgs::ImageConstPtr &msg);  // add
     void set_image_pose( std::shared_ptr<Image_frame> & image_pose, const StatesGroup & state );
     void publish_camera_odom(std::shared_ptr<Image_frame> & image, double msg_time);
     void publish_track_img(cv::Mat & img, double frame_cost_time);
@@ -305,6 +307,7 @@ public:
     bool vio_photometric(StatesGroup &state_in, Rgbmap_tracker &op_track, std::shared_ptr<Image_frame> & image);
     void service_VIO_update();
     void service_process_img_buffer();
+    void process_mask_buffer();  // add
     void service_pub_rgb_maps();
     char cv_keyboard_callback();
     void set_initial_state_cov(StatesGroup &stat);
@@ -409,7 +412,7 @@ public:
             cout << ANSI_COLOR_BLUE_BOLD << "Create r3live output dir: " << m_map_output_dir << ANSI_COLOR_RESET << endl;
             Common_tools::create_dir(m_map_output_dir);
         }
-        m_thread_pool_ptr = std::make_shared<Common_tools::ThreadPool>(6, true, false); // At least 5 threads are needs, here we allocate 6 threads.
+        m_thread_pool_ptr = std::make_shared<Common_tools::ThreadPool>(7, true, false); // At least 5 threads are needs, here we allocate 6 threads.
         g_cost_time_logger.init_log( std::string(m_map_output_dir).append("/cost_time_logger.log"));
         m_map_rgb_pts.set_minmum_dis(m_minumum_rgb_pts_size);
         m_map_rgb_pts.m_recent_visited_voxel_activated_time = m_recent_visited_voxel_activated_time;

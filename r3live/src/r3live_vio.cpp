@@ -55,7 +55,7 @@ std::shared_ptr< Common_tools::ThreadPool > m_thread_pool_ptr;
 double                                      g_vio_frame_cost_time = 0;
 double                                      g_lio_frame_cost_time = 0;
 int                                         g_flag_if_first_rec_img = 1;
-int                                         g_flag_if_first_rec_mask_img = 1; // add
+int                                         g_flag_if_first_rec_mask = 1; // add
 #define DEBUG_PHOTOMETRIC 0
 #define USING_CERES 0
 void dump_lio_state_to_log( FILE *fp )
@@ -263,8 +263,8 @@ std::mutex mutex_mask_image_callback; // add
 std::deque< sensor_msgs::CompressedImageConstPtr > g_received_compressed_img_msg;
 std::deque< sensor_msgs::ImageConstPtr >           g_received_img_msg;
 std::shared_ptr< std::thread >                     g_thr_process_image;
+std::deque< sensor_msgs::ImageConstPtr >           g_received_img_mask_msg; // add
 
-std::deque< sensor_msgs::CompressedImageConstPtr > g_received_img_mask_msg; // add
 void R3LIVE::service_process_img_buffer()
 {
     while ( 1 )
@@ -361,16 +361,37 @@ void R3LIVE::image_callback( const sensor_msgs::ImageConstPtr &msg )
     process_image( temp_img, msg->header.stamp.toSec() );
 }
 
-void R3LIVE::image_mask_callback( const sensor_msgs::CompressedImageConstPtr &msg ) // add
+void R3LIVE::process_mask_buffer() // add
 {
-    mutex_mask_image_callback.lock();
-    g_received_img_mask_msg.push_back( msg );
-    if ( g_flag_if_first_rec_mask_img )
+    // process the mask msg, and save the msg to the mask image buffer
+    while ( g_received_img_mask_msg.size() == 0 )
     {
-        g_flag_if_first_rec_mask_img = 0;
-        m_thread_pool_ptr->commit_task( &R3LIVE::service_process_img_buffer, this );
+        ros::spinOnce();
+        std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
+        std::this_thread::yield();
     }
+
+    sensor_msgs::ImageConstPtr msg = g_received_img_mask_msg.front();
+    double  mask_rec_time = msg->header.stamp.toSec();
+    cv::Mat mask_get = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::MONO8 )->image.clone(); // copy a new mask msg
+    mutex_mask_image_callback.lock();
+    g_received_img_mask_msg.pop_front();
     mutex_mask_image_callback.unlock();
+    // process the mask msg
+    m_mask_data_mutex.lock();
+    m_queue_mask.push_back( mask_get ); // add the grep image into the queue
+    m_mask_data_mutex.unlock();
+}
+
+void R3LIVE::image_mask_callback( const sensor_msgs::ImageConstPtr &msg ) // add
+{
+    std::unique_lock< std::mutex > lock3( mutex_mask_image_callback );
+    g_received_img_mask_msg.push_back( msg );
+    if ( g_flag_if_first_rec_mask )
+    {
+        g_flag_if_first_rec_mask = 0;
+        m_thread_pool_ptr->commit_task( &R3LIVE::process_mask_buffer, this );
+    }
 }
 
 double last_accept_time = 0;
@@ -456,8 +477,8 @@ void R3LIVE::load_vio_parameters()
     m_ros_node_handle.getParam( "r3live_vio/camera_ext_R", camera_ext_R_data );
     m_ros_node_handle.getParam( "r3live_vio/camera_ext_t", camera_ext_t_data );
 
-    m_ros_node_handle.getParam( "r3live_mask/image_width", m_vio_image_mask_width );
-    m_ros_node_handle.getParam( "r3live_mask/image_height", m_vio_image_mask_heigh );
+    m_ros_node_handle.getParam( "r3live_mask/image_width", m_vio_image_mask_width );  // add
+    m_ros_node_handle.getParam( "r3live_mask/image_height", m_vio_image_mask_heigh );  // add
     CV_Assert( ( m_vio_image_width != 0 && m_vio_image_heigh != 0 ) );
 
     if ( ( camera_intrinsic_data.size() != 9 ) || ( camera_dist_coeffs_data.size() != 5 ) || ( camera_ext_R_data.size() != 9 ) ||
