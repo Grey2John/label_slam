@@ -258,12 +258,12 @@ void R3LIVE::publish_raw_img( cv::Mat &img )
 
 int        sub_image_typed = 0; // 0: TBD 1: sub_raw, 2: sub_comp
 std::mutex mutex_image_callback;
-std::mutex mutex_mask_image_callback; // add
+// std::mutex mutex_mask_image_callback; // add
 
 std::deque< sensor_msgs::CompressedImageConstPtr > g_received_compressed_img_msg;
 std::deque< sensor_msgs::ImageConstPtr >           g_received_img_msg;
 std::shared_ptr< std::thread >                     g_thr_process_image;
-std::deque< sensor_msgs::ImageConstPtr >           g_received_img_mask_msg; // add
+// std::deque< sensor_msgs::ImageConstPtr >           g_received_img_mask_msg; // add
 
 void R3LIVE::service_process_img_buffer()
 {
@@ -314,7 +314,7 @@ void R3LIVE::service_process_img_buffer()
                 std::this_thread::yield();
             }
             sensor_msgs::ImageConstPtr msg = g_received_img_msg.front();
-            image_get = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGR8 )->image.clone();
+            image_get = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGRA8 )->image.clone();  // modify
             img_rec_time = msg->header.stamp.toSec();
             mutex_image_callback.lock();
             g_received_img_msg.pop_front();
@@ -357,49 +357,51 @@ void R3LIVE::image_callback( const sensor_msgs::ImageConstPtr &msg )
         m_thread_pool_ptr->commit_task( &R3LIVE::service_process_img_buffer, this );
     }
 
-    cv::Mat temp_img = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGR8 )->image.clone();
+    cv::Mat temp_img = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGRA8 )->image.clone();  // modify
     process_image( temp_img, msg->header.stamp.toSec() );
 }
 
-void R3LIVE::process_mask_buffer() // add
-{
-    // process the mask msg, and save the msg to the mask image buffer
-    while ( g_received_img_mask_msg.size() == 0 )
-    {
-        ros::spinOnce();
-        std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
-        std::this_thread::yield();
-    }
+// void R3LIVE::process_mask_buffer() // add
+// {
+//     // process the mask msg, and save the msg to the mask image buffer
+//     while ( g_received_img_mask_msg.size() == 0 )
+//     {
+//         ros::spinOnce();
+//         std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
+//         std::this_thread::yield();
+//     }
 
-    sensor_msgs::ImageConstPtr msg = g_received_img_mask_msg.front();
-    double  mask_rec_time = msg->header.stamp.toSec();
-    cv::Mat mask_get = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::MONO8 )->image.clone(); // copy a new mask msg
-    mutex_mask_image_callback.lock();
-    g_received_img_mask_msg.pop_front();
-    mutex_mask_image_callback.unlock();
-    // process the mask msg
-    m_mask_data_mutex.lock();
-    m_queue_mask.push_back( mask_get ); // add the grep image into the queue
-    m_mask_data_mutex.unlock();
-}
+//     sensor_msgs::ImageConstPtr msg = g_received_img_mask_msg.front();
+//     double  mask_rec_time = msg->header.stamp.toSec();
+//     cv::Mat mask_get = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::MONO8 )->image.clone(); // copy a new mask msg
+//     mutex_mask_image_callback.lock();
+//     g_received_img_mask_msg.pop_front();
+//     mutex_mask_image_callback.unlock();
+//     // process the mask msg
+//     m_mask_data_mutex.lock();
+//     m_queue_mask_matrix.push_back( mask_get ); // add the grey mask into the queue
+//     m_mask_data_mutex.unlock();
 
-void R3LIVE::image_mask_callback( const sensor_msgs::ImageConstPtr &msg ) // add
-{
-    std::unique_lock< std::mutex > lock3( mutex_mask_image_callback );
-    g_received_img_mask_msg.push_back( msg );
-    if ( g_flag_if_first_rec_mask )
-    {
-        g_flag_if_first_rec_mask = 0;
-        m_thread_pool_ptr->commit_task( &R3LIVE::process_mask_buffer, this );
-    }
-}
+// }
+
+// void R3LIVE::image_mask_callback( const sensor_msgs::ImageConstPtr &msg ) // add
+// {
+//     std::unique_lock< std::mutex > lock3( mutex_mask_image_callback );
+//     g_received_img_mask_msg.push_back( msg );
+//     if ( g_flag_if_first_rec_mask )
+//     {
+//         g_flag_if_first_rec_mask = 0;
+//         m_thread_pool_ptr->commit_task( &R3LIVE::process_mask_buffer, this );
+//     }
+// }
 
 double last_accept_time = 0;
 int    buffer_max_frame = 0;
 int    total_frame_count = 0;
 void   R3LIVE::process_image( cv::Mat &temp_img, double msg_time )
 {
-    cv::Mat img_get;
+    cv::Mat img_get(temp_img.rows, temp_img.cols, CV_8UC3);
+    cv::Mat m_mask(temp_img.rows, temp_img.cols, CV_8UC1);
     if ( temp_img.rows == 0 )
     {
         cout << "Process image error, image rows =0 " << endl;
@@ -441,7 +443,15 @@ void   R3LIVE::process_image( cv::Mat &temp_img, double msg_time )
     }
     else
     {
-        img_get = temp_img; // clone ?
+        vector<cv::Mat> channels;
+        cv::split(temp_img, channels);
+        vector<cv::Mat> channels3;
+        channels3.push_back(channels[0]);
+        channels3.push_back(channels[1]);
+        channels3.push_back(channels[2]);
+        cv::merge(channels3, img_get);
+
+        cv::extractChannel(temp_img, m_mask, 3); // modify (720, 1280, 3)
     }
     std::shared_ptr< Image_frame > img_pose = std::make_shared< Image_frame >( g_cam_K );
     if ( m_if_pub_raw_img )
@@ -449,6 +459,7 @@ void   R3LIVE::process_image( cv::Mat &temp_img, double msg_time )
         img_pose->m_raw_img = img_get;
     }
     cv::remap( img_get, img_pose->m_img, m_ud_map1, m_ud_map2, cv::INTER_LINEAR );
+    cv::remap( m_mask, img_pose->m_mask_matrix, m_ud_map1, m_ud_map2, cv::INTER_LINEAR );  // add undistort
     // cv::imshow("sub Img", img_pose->m_img);
     img_pose->m_timestamp = msg_time;
     img_pose->init_cubic_interpolation();
@@ -477,8 +488,8 @@ void R3LIVE::load_vio_parameters()
     m_ros_node_handle.getParam( "r3live_vio/camera_ext_R", camera_ext_R_data );
     m_ros_node_handle.getParam( "r3live_vio/camera_ext_t", camera_ext_t_data );
 
-    m_ros_node_handle.getParam( "r3live_mask/image_width", m_vio_image_mask_width );  // add
-    m_ros_node_handle.getParam( "r3live_mask/image_height", m_vio_image_mask_heigh );  // add
+    m_ros_node_handle.getParam( "r3live_mask/image_width", m_vio_mask_width );  // add
+    m_ros_node_handle.getParam( "r3live_mask/image_height", m_vio_mask_heigh );  // add
     CV_Assert( ( m_vio_image_width != 0 && m_vio_image_heigh != 0 ) );
 
     if ( ( camera_intrinsic_data.size() != 9 ) || ( camera_dist_coeffs_data.size() != 5 ) || ( camera_ext_R_data.size() != 9 ) ||
@@ -768,7 +779,7 @@ bool      R3LIVE::vio_esikf( StatesGroup &state_in, Rgbmap_tracker &op_track )
                 H_mat( pt_idx * 2, 25 ) = pt_3d_cam( 0 ) / pt_3d_cam( 2 ) * huber_loss_scale;
                 H_mat( pt_idx * 2 + 1, 26 ) = pt_3d_cam( 1 ) / pt_3d_cam( 2 ) * huber_loss_scale;
                 H_mat( pt_idx * 2, 27 ) = 1 * huber_loss_scale;
-                H_mat( pt_idx * 2 + 1, 28 ) = 1 * huber_loss_scale;
+                H_mat( pt_idx * 2 + 1, 28 ) = 1 * huber_loss_scale; 
             }
         }
         H_mat = H_mat / img_res_scale;
@@ -1074,7 +1085,7 @@ void R3LIVE::service_pub_rgb_maps()
     }
 }
 
-void R3LIVE::publish_render_pts( ros::Publisher &pts_pub, Global_map &m_map_rgb_pts )
+void R3LIVE::publish_render_pts( ros::Publisher &pts_pub, Global_map &m_map_rgb_pts ) // not use
 {
     pcl::PointCloud< pcl::PointXYZRGB > pc_rgb;
     sensor_msgs::PointCloud2            ros_pc_msg;
@@ -1164,6 +1175,11 @@ void R3LIVE::service_VIO_update()
         double                             message_time = img_pose->m_timestamp;
         m_queue_image_with_pose.pop_front();
         m_camera_data_mutex.unlock();
+
+        // m_mask_data_mutex.lock();  // add
+        // cv::Mat seg_mask = m_queue_mask_matrix.front();  // add
+        // m_mask_data_mutex.unlock();  // add
+        
         g_camera_lidar_queue.m_last_visual_time = img_pose->m_timestamp + g_lio_state.td_ext_i2c;
 
         img_pose->set_frame_idx( g_camera_frame_idx );
@@ -1242,7 +1258,7 @@ void R3LIVE::service_VIO_update()
                 // m_map_rgb_pts.render_pts_in_voxels_mp(img_pose, &m_map_rgb_pts.m_rgb_pts_in_recent_visited_voxels,
                 // img_pose->m_timestamp);
                 m_render_thread = std::make_shared< std::shared_future< void > >( m_thread_pool_ptr->commit_task(
-                    render_pts_in_voxels_mp, img_pose, &m_map_rgb_pts.m_voxels_recent_visited, img_pose->m_timestamp ) );
+                    render_pts_in_voxels_mp, img_pose, &m_map_rgb_pts.m_voxels_recent_visited, img_pose->m_timestamp  ) );
             }
             else
             {

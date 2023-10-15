@@ -149,6 +149,63 @@ inline void reduce_vector(std::vector<T> &v, std::vector<uchar> status)
 
 const int MAX_DS_LAY = 7;
 
+
+struct Mask_Pixel  // add
+{
+    int x; // heng 
+    int y; // zong
+    int label_state; 
+    // std::vector< std::array<int, 3> > near_points_info;
+    int class_num;
+    int obs_state;
+
+    void clear_all() 
+    {
+        x = 0;
+        y = 0;
+        label_state = 0;
+        class_num = 0;
+        obs_state = 0;
+        // near_points_info.clear();
+    }
+
+    void pixel_around(const cv::Mat & one_mask)
+    {
+        int num = 0;
+        int label;
+        std::vector<int> A;
+        for (int u=0; u<5; ++u) {
+            for (int v=0; v<5; ++v) {
+                if (y+v-2<0 || y+v-2>960 || x+u-2<0 || x+u-2>720) {
+                    continue;
+                }
+                label = static_cast<int>( one_mask.at<uchar>(x+u-2, y+v-2) );
+                if (std::find(A.begin(), A.end(), label) == A.end())
+                {
+                    A.push_back(label);
+                    num++;
+                }
+            }
+            if (num>=3) {break;}
+        }
+        sort(A.begin(), A.end());
+        class_num = num;
+        for (int i = 0; i < obs_sample.size (); ++i) {
+            if (obs_sample[i].size() == A.size() && 
+            std::equal(obs_sample[i].begin(), obs_sample[i].end(), A.begin()) )
+            {
+                obs_state = i;
+                break;
+            }
+        }
+    }
+    
+    private:
+        std::vector< std::vector<int> > obs_sample = {{0},    {1},    {2}, 
+                                                {0, 1}, {0, 2}, {1, 2},
+                                                {0, 1, 2}};
+};
+
 struct Image_frame
 {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -180,6 +237,7 @@ struct Image_frame
     cv::Mat m_img;
     cv::Mat m_raw_img;
     cv::Mat m_img_gray;
+    cv::Mat m_mask_matrix;  // add, CV_8UC1 uchar type
 
     double m_fov_margin = 0.005;
     
@@ -197,6 +255,7 @@ struct Image_frame
     bool if_2d_points_available(const double &u, const double &v, const double &scale = 1.0, double fov_mar = -1.0);
     vec_3 get_rgb(double &u, double v, int layer = 0, vec_3 *rgb_dx = nullptr, vec_3 *rgb_dy = nullptr);
     double get_grey_color(double & u ,double & v, int layer= 0 );
+    bool get_mask_label_each_point(const double & u ,const double & v, Mask_Pixel & label_pixel);  // add
     bool get_rgb( const double & u,  const double & v, int & r, int & g, int & b  );
     void display_pose();
     void image_equalize(cv::Mat &img, int amp = 10.0);

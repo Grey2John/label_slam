@@ -406,26 +406,31 @@ static inline double thread_render_pts_in_voxel(const int & pt_start, const int 
     vec_3 rgb_color;
     double u, v;
     double pt_cam_norm;
+    Mask_Pixel label_pixel; // add
     Common_tools::Timer tim;
     tim.tic();
     for (int voxel_idx = pt_start; voxel_idx < pt_end; voxel_idx++)
     {
         // continue;
         RGB_voxel_ptr voxel_ptr = (*voxels_for_render)[ voxel_idx ];
-        for ( int pt_idx = 0; pt_idx < voxel_ptr->m_pts_in_grid.size(); pt_idx++ )
+        for ( int pt_idx = 0; pt_idx < voxel_ptr->m_pts_in_grid.size(); pt_idx++ )  // every point
         {
             pt_w = voxel_ptr->m_pts_in_grid[pt_idx]->get_pos();
-            if ( img_ptr->project_3d_point_in_this_img( pt_w, u, v, nullptr, 1.0 ) == false )
+            if ( img_ptr->project_3d_point_in_this_img( pt_w, u, v, nullptr, 1.0 ) == false )   // important, get u, v
             {
                 continue;
             }
             pt_cam_norm = ( pt_w - img_ptr->m_pose_w2c_t ).norm();
-            // double gray = img_ptr->get_grey_color(u, v, 0);
+
+            label_pixel.clear_all();  // add
+            img_ptr->get_mask_label_each_point(u, v, label_pixel);   // add, point label info is in the label_pixel
             // pts_for_render[i]->update_gray(gray, pt_cam_norm);
             rgb_color = img_ptr->get_rgb( u, v, 0 );
             if (  voxel_ptr->m_pts_in_grid[pt_idx]->update_rgb(
-                     rgb_color, pt_cam_norm, vec_3( image_obs_cov, image_obs_cov, image_obs_cov ), obs_time ) )
+                     rgb_color, pt_cam_norm, vec_3( image_obs_cov, image_obs_cov, image_obs_cov ), obs_time ) )  // update point
             {
+                voxel_ptr->m_pts_in_grid[pt_idx]->m_label_state = label_pixel.label_state;  // add
+                voxel_ptr->m_pts_in_grid[pt_idx]->m_obs_state.push_back(label_pixel.obs_state);  // add
                 render_pts_count++;
             }
         }
@@ -435,7 +440,9 @@ static inline double thread_render_pts_in_voxel(const int & pt_start, const int 
 }
 
 std::vector<RGB_voxel_ptr>  g_voxel_for_render;
-void render_pts_in_voxels_mp(std::shared_ptr<Image_frame> &img_ptr, std::unordered_set<RGB_voxel_ptr> * _voxels_for_render,  const double & obs_time)
+void render_pts_in_voxels_mp(std::shared_ptr<Image_frame> &img_ptr, 
+                            std::unordered_set<RGB_voxel_ptr> * _voxels_for_render,  
+                            const double & obs_time )
 {
     Common_tools::Timer tim;
     g_voxel_for_render.clear();
@@ -651,9 +658,45 @@ void Global_map::save_to_pcd(std::string dir_name, std::string _file_name, int s
     cout << "Save PCD cost time = " << tim.toc() << endl;
 }
 
+void Global_map::save_pt_obs(std::string dir_name, std::string _file_name, int save_pts_with_obs)  // add
+{
+    Common_tools::Timer tim;
+    scope_color(ANSI_COLOR_GREEN_BOLD);
+    cout << "== start Save txt ==" << endl;
+    tim.tic();
+
+    long pt_size = m_rgb_pts_vec.size();
+    cout << "we get " << pt_size << " points info" << endl;
+    long pt_count = 0;
+    std::string file_name = std::string(dir_name).append(_file_name);
+    std::ofstream out_save_txt(std::string(file_name).append(".txt"));
+    for (long i = pt_size - 1; i > 0; i--)
+    {
+        if (m_rgb_pts_vec[i]->m_obs_state.size() < save_pts_with_obs)
+        {
+            continue;
+        }
+        out_save_txt << pt_count << ", ";
+        int size = m_rgb_pts_vec[i]->m_obs_state.size();
+        // cout << "size is " << size << endl;
+        for (int j = 0; j < size-1; j++)
+        {
+            out_save_txt << m_rgb_pts_vec[i]->m_obs_state[j];
+            out_save_txt << ", ";
+        }
+        out_save_txt << m_rgb_pts_vec[i]->m_obs_state[size - 1];
+        out_save_txt << "\n";
+        pt_count++;
+    }
+    cout << "finally, we selet " << pt_count << " points" << endl;
+    out_save_txt.close();
+    cout << "Save txt finished, cust time = " << tim.toc() << endl;
+}
+
 void Global_map::save_and_display_pointcloud(std::string dir_name, std::string file_name, int save_pts_with_views)
 {
     save_to_pcd(dir_name, file_name, save_pts_with_views);
+    save_pt_obs(dir_name, std::string("/pt_obs"), 2);  // add
     scope_color(ANSI_COLOR_WHITE_BOLD);
     cout << "========================================================" << endl;
     cout << "Open pcl_viewer to display point cloud, close the viewer's window to continue mapping process ^_^" << endl;

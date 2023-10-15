@@ -50,6 +50,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 #include <mutex>
 #include <math.h>
 #include <thread>
+#include <array>
 #include <fstream>
 #include <csignal>
 #include <unistd.h>
@@ -124,6 +125,7 @@ void dump_lio_state_to_log(FILE *fp);
 
 extern Common_tools::Cost_time_logger g_cost_time_logger;
 extern std::shared_ptr<Common_tools::ThreadPool> m_thread_pool_ptr;
+
 class R3LIVE
 {
 public:
@@ -230,11 +232,11 @@ public:
     ros::Publisher m_pub_render_rgb_pts;
     std::vector< std::shared_ptr <ros::Publisher> > m_pub_rgb_render_pointcloud_ptr_vec;
     std::mutex m_camera_data_mutex;
-    std::mutex m_mask_data_mutex;  // add
+    // std::mutex m_mask_data_mutex;  // add
     double m_camera_start_ros_tim = -3e8;
     std::deque<sensor_msgs::ImageConstPtr> m_queue_image_msg; // useless
     std::deque<std::shared_ptr<Image_frame>> m_queue_image_with_pose;
-    std::deque<cv::Mat> m_queue_mask; // add
+    // std::deque<cv::Mat> m_queue_mask_matrix; // add
     std::list<std::shared_ptr<Image_frame>> g_image_vec;
     Eigen::Matrix3d g_cam_K;
     Eigen::Matrix<double, 5, 1> g_cam_dist;
@@ -253,8 +255,8 @@ public:
     double m_minumum_rgb_pts_size = 0.05;
     double m_vio_image_width = 0;
     double m_vio_image_heigh = 0;
-    double m_vio_image_mask_width = 0; // add
-    double m_vio_image_mask_heigh = 0; // add
+    double m_vio_mask_width = 0; // add
+    double m_vio_mask_heigh = 0; // add
     int m_if_estimate_i2c_extrinsic = 1;
     int m_if_estimate_intrinsic = 1;
     double m_control_image_freq =  100; 
@@ -296,7 +298,7 @@ public:
     void process_image(cv::Mat & image, double msg_time);
     void image_callback(const sensor_msgs::ImageConstPtr &msg);
     void image_comp_callback(const sensor_msgs::CompressedImageConstPtr &msg);
-    void image_mask_callback(const sensor_msgs::ImageConstPtr &msg);  // add
+    // void image_mask_callback(const sensor_msgs::ImageConstPtr &msg);  // add
     void set_image_pose( std::shared_ptr<Image_frame> & image_pose, const StatesGroup & state );
     void publish_camera_odom(std::shared_ptr<Image_frame> & image, double msg_time);
     void publish_track_img(cv::Mat & img, double frame_cost_time);
@@ -307,7 +309,7 @@ public:
     bool vio_photometric(StatesGroup &state_in, Rgbmap_tracker &op_track, std::shared_ptr<Image_frame> & image);
     void service_VIO_update();
     void service_process_img_buffer();
-    void process_mask_buffer();  // add
+    // void process_mask_buffer();  // add
     void service_pub_rgb_maps();
     char cv_keyboard_callback();
     void set_initial_state_cov(StatesGroup &stat);
@@ -338,7 +340,7 @@ public:
         get_ros_parameter<std::string>(m_ros_node_handle, "/IMU_topic", IMU_topic, std::string("/livox/imu") );
         get_ros_parameter<std::string>(m_ros_node_handle, "/Image_topic", IMAGE_topic, std::string("/camera/image_color") );
         IMAGE_topic_compressed = std::string(IMAGE_topic).append("/compressed");
-        get_ros_parameter<std::string>(m_ros_node_handle, "/Image_mask_topic", IMAGE_mask_topic, std::string("/yolov5/segment/compressed") ); // add
+        // get_ros_parameter<std::string>(m_ros_node_handle, "/Image_mask_topic", IMAGE_mask_topic, std::string("/yolov5/segment/compressed") ); // add
         if(1)
         {
             scope_color(ANSI_COLOR_BLUE_BOLD);
@@ -357,7 +359,7 @@ public:
         sub_pcl = m_ros_node_handle.subscribe(LiDAR_pointcloud_topic.c_str(), 2000000, &R3LIVE::feat_points_cbk, this, ros::TransportHints().tcpNoDelay());
         sub_img = m_ros_node_handle.subscribe(IMAGE_topic.c_str(), 1000000, &R3LIVE::image_callback, this, ros::TransportHints().tcpNoDelay());
         sub_img_comp = m_ros_node_handle.subscribe(IMAGE_topic_compressed.c_str(), 1000000, &R3LIVE::image_comp_callback, this, ros::TransportHints().tcpNoDelay());
-        sub_img_mask = m_ros_node_handle.subscribe(IMAGE_mask_topic.c_str(), 1000000, &R3LIVE::image_mask_callback, this, ros::TransportHints().tcpNoDelay()); // add
+        // sub_img_mask = m_ros_node_handle.subscribe(IMAGE_mask_topic.c_str(), 1000000, &R3LIVE::image_mask_callback, this, ros::TransportHints().tcpNoDelay()); // add
 
         m_ros_node_handle.getParam("/initial_pose", m_initial_pose);
         m_pub_rgb_render_pointcloud_ptr_vec.resize(1e3);
@@ -412,7 +414,7 @@ public:
             cout << ANSI_COLOR_BLUE_BOLD << "Create r3live output dir: " << m_map_output_dir << ANSI_COLOR_RESET << endl;
             Common_tools::create_dir(m_map_output_dir);
         }
-        m_thread_pool_ptr = std::make_shared<Common_tools::ThreadPool>(7, true, false); // At least 5 threads are needs, here we allocate 6 threads.
+        m_thread_pool_ptr = std::make_shared<Common_tools::ThreadPool>(6, true, false); // At least 5 threads are needs, here we allocate 6 threads.
         g_cost_time_logger.init_log( std::string(m_map_output_dir).append("/cost_time_logger.log"));
         m_map_rgb_pts.set_minmum_dis(m_minumum_rgb_pts_size);
         m_map_rgb_pts.m_recent_visited_voxel_activated_time = m_recent_visited_voxel_activated_time;

@@ -153,8 +153,8 @@ bool Image_frame::project_3d_to_2d(const pcl::PointXYZI & in_pt, Eigen::Matrix3d
     {
         return false;
     }
-    u = (pt_cam(0) * fx / pt_cam(2) + cx) * scale;
-    v = (pt_cam(1) * fy / pt_cam(2) + cy) * scale;
+    u = (pt_cam(0) * fx / pt_cam(2) + cx) * scale; // x matrix zong
+    v = (pt_cam(1) * fy / pt_cam(2) + cy) * scale;  // y matrix heng
     return true;
 }
 
@@ -252,6 +252,17 @@ double Image_frame::get_grey_color( double &u, double &v, int layer )
     }
 
     return m_gama_para( 0 ) * val + m_gama_para( 1 );
+}
+
+bool Image_frame::get_mask_label_each_point(const double & u ,const double & v, Mask_Pixel & label_pixel)  // add
+{
+    // u,v is in the pixel coordination
+    label_pixel.y = static_cast<int>(std::round(u));
+    label_pixel.x = static_cast<int>(std::round(v));
+    label_pixel.label_state = static_cast<int>( m_mask_matrix.at<uchar>(label_pixel.x, label_pixel.y) ); // get pxiel label
+
+    label_pixel.pixel_around(m_mask_matrix);
+    return true;
 }
 
 bool Image_frame::get_rgb(const double &u, const double &v, int &r, int &g, int &b)

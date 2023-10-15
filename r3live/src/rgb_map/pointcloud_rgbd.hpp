@@ -82,7 +82,8 @@ class RGB_pts
     int    m_N_rgb = 0;
     int    m_pt_index = 0;
 
-    int    m_label = 0; // add
+    int    m_label_state = 0;  // add
+    std::vector<int> m_obs_state;  // add
 #endif
     vec_2      m_img_vel;
     vec_2      m_img_pt_in_last_frame;
@@ -107,7 +108,9 @@ class RGB_pts
         int b = g_rng.uniform( 0, 256 );
         m_dbg_color = cv::Scalar( r, g, b );
         // m_rgb = vec_3(255, 255, 255);
-        m_label = 0;
+
+        m_label_state = 0; // add
+        m_obs_state.clear();  // add
     };
 
     RGB_pts()
@@ -200,6 +203,7 @@ struct Global_map
     void selection_points_for_projection( std::shared_ptr< Image_frame > &image_pose, std::vector< std::shared_ptr< RGB_pts > > *pc_out_vec = nullptr,
                                           std::vector< cv::Point2f > *pc_2d_out_vec = nullptr, double minimum_dis = 5, int skip_step = 1,int use_all_pts = 0 );
     void save_to_pcd( std::string dir_name, std::string file_name = std::string( "/rgb_pt" ) , int save_pts_with_views = 3);
+    void save_pt_obs( std::string dir_name, std::string file_name = std::string( "/pt_obs" ), int save_pts_with_obs=2 );  // add
     void save_and_display_pointcloud( std::string dir_name = std::string( "/home/ziv/temp/" ), std::string file_name = std::string( "/rgb_pt" ) ,  int save_pts_with_views = 3);
     void render_pts_in_voxels( std::shared_ptr< Image_frame > &img_ptr, std::vector< std::shared_ptr< RGB_pts > > &voxels_for_render, double obs_time = 0 );
 
@@ -213,9 +217,9 @@ struct Global_map
 };
 
 
-
-
-void render_pts_in_voxels_mp( std::shared_ptr< Image_frame > &img_ptr, std::unordered_set< RGB_voxel_ptr > *voxels_for_render, const double &obs_time = 0 );
+void render_pts_in_voxels_mp( std::shared_ptr< Image_frame > &img_ptr, 
+                                std::unordered_set< RGB_voxel_ptr > *voxels_for_render, 
+                                const double &obs_time = 0 );
 
 template < typename Archive >
 inline void save( Archive &ar, const Global_map &global_map, const unsigned int /*version*/ )
