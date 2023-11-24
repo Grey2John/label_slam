@@ -169,27 +169,67 @@ struct Mask_Pixel  // add
         // near_points_info.clear();
     }
 
-    void pixel_around(const cv::Mat & one_mask)
+    void pixel_around(const cv::Mat & one_mask, int pixel_dist)
     {
         int num = 0;
         int label;
         std::vector<int> A;
-        for (int u=0; u<5; ++u) {
-            for (int v=0; v<5; ++v) {
-                if (y+v-2<0 || y+v-2>960 || x+u-2<0 || x+u-2>720) {
+        int H_s = (x - pixel_dist < 0) ? 0 : x - pixel_dist;
+        int H_e = (x + pixel_dist+1 > 719) ? 719 : x + pixel_dist+1;
+        int W_s = y - pixel_dist;
+        int W_e = y + pixel_dist+1;
+
+        cv::Mat sub_mask = one_mask( cv::Range(H_s, H_e), cv::Range(W_s, W_e) );  // H, W
+        cv::MatIterator_<uchar> it = sub_mask.begin<uchar>();
+        cv::MatIterator_<uchar> it_end = sub_mask.end<uchar>();
+
+        for (int i = 0; i < sub_mask.rows; i++) {
+            for (int j = 0; j < sub_mask.cols; j++) {
+                int element = sub_mask.at<uchar>(i, j);
+                if (std::find(A.begin(), A.end(), element) == A.end())
+                {
+                    A.push_back(element);
+                    num++;
+                }
+                if (num>=3) {break;}
+            }
+            if (num>=3) {break;}
+        }
+
+        sort(A.begin(), A.end());
+        for (int i = 0; i < obs_sample.size (); ++i) {
+            if (obs_sample[i].size() == A.size() && 
+            std::equal(obs_sample[i].begin(), obs_sample[i].end(), A.begin()) )
+            {
+                obs_state = i;
+                break;
+            }
+        }
+    }
+
+        void pixel_around1(const cv::Mat & one_mask, int pixel_dist)
+    {
+        int num = 0;
+        int label;
+        std::vector<int> A;
+        int range_pixel = pixel_dist*2+1;
+        for (int u=0; u<range_pixel; ++u) {
+            for (int v=0; v<range_pixel; ++v) {
+                if (y+v-pixel_dist<0 || y+v-pixel_dist>960 || x+u-pixel_dist<0 || x+u-pixel_dist>719) {
                     continue;
                 }
-                label = static_cast<int>( one_mask.at<uchar>(x+u-2, y+v-2) );
+                label = static_cast<int>( one_mask.at<uchar>(x+u-pixel_dist, y+v-pixel_dist) );
                 if (std::find(A.begin(), A.end(), label) == A.end())
                 {
                     A.push_back(label);
                     num++;
                 }
+                if (num>=3) {break;}
             }
             if (num>=3) {break;}
         }
+
         sort(A.begin(), A.end());
-        class_num = num;
         for (int i = 0; i < obs_sample.size (); ++i) {
             if (obs_sample[i].size() == A.size() && 
             std::equal(obs_sample[i].begin(), obs_sample[i].end(), A.begin()) )

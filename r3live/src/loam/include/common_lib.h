@@ -60,6 +60,7 @@ static const Eigen::Vector3f Zero3f(0, 0, 0);
 // Eigen::Vector3d Lidar_offset_to_IMU(0.05512, 0.02226, 0.0297); // Horizon
 // static const Eigen::Vector3d Lidar_offset_to_IMU(0.03094356, 0.0710426, -0.07472593); // Avia
 static const Eigen::Vector3d Lidar_offset_to_IMU(0.00694707,  0.07088977, -0.07079593);
+// static const Eigen::Vector3d Lidar_offset_to_IMU(0.00694707,  0.07088977, -0.07079593);  // good
 
 struct Pose6D
 {

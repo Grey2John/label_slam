@@ -261,7 +261,7 @@ bool Image_frame::get_mask_label_each_point(const double & u ,const double & v, 
     label_pixel.x = static_cast<int>(std::round(v));
     label_pixel.label_state = static_cast<int>( m_mask_matrix.at<uchar>(label_pixel.x, label_pixel.y) ); // get pxiel label
 
-    label_pixel.pixel_around(m_mask_matrix);
+    label_pixel.pixel_around(m_mask_matrix, 4);
     return true;
 }
 

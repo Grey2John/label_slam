@@ -429,7 +429,11 @@ static inline double thread_render_pts_in_voxel(const int & pt_start, const int 
             if (  voxel_ptr->m_pts_in_grid[pt_idx]->update_rgb(
                      rgb_color, pt_cam_norm, vec_3( image_obs_cov, image_obs_cov, image_obs_cov ), obs_time ) )  // update point
             {
-                voxel_ptr->m_pts_in_grid[pt_idx]->m_label_state = label_pixel.label_state;  // add
+                if (voxel_ptr->m_pts_in_grid[pt_idx]->if_first_label)  // add
+                {
+                    voxel_ptr->m_pts_in_grid[pt_idx]->m_init_label_state = label_pixel.label_state;  
+                    voxel_ptr->m_pts_in_grid[pt_idx]->if_first_label=0;
+                }
                 voxel_ptr->m_pts_in_grid[pt_idx]->m_obs_state.push_back(label_pixel.obs_state);  // add
                 render_pts_count++;
             }
@@ -670,13 +674,22 @@ void Global_map::save_pt_obs(std::string dir_name, std::string _file_name, int s
     long pt_count = 0;
     std::string file_name = std::string(dir_name).append(_file_name);
     std::ofstream out_save_txt(std::string(file_name).append(".txt"));
+    int num = 1;
     for (long i = pt_size - 1; i > 0; i--)
     {
         if (m_rgb_pts_vec[i]->m_obs_state.size() < save_pts_with_obs)
         {
             continue;
         }
-        out_save_txt << pt_count << ", ";
+        out_save_txt << m_rgb_pts_vec[i]->m_pos[ 0 ] << ", ";  // xyz
+        out_save_txt << m_rgb_pts_vec[i]->m_pos[ 1 ] << ", ";
+        out_save_txt << m_rgb_pts_vec[i]->m_pos[ 2 ] << ", ";
+        out_save_txt << m_rgb_pts_vec[i]->m_rgb[ 0 ] << ", ";  // rgb
+        out_save_txt << m_rgb_pts_vec[i]->m_rgb[ 1 ] << ", ";
+        out_save_txt << m_rgb_pts_vec[i]->m_rgb[ 2 ] << ", ";
+
+        out_save_txt << num++ << ", ";  // No
+        out_save_txt << m_rgb_pts_vec[i]->m_init_label_state << ", ";  // init label
         int size = m_rgb_pts_vec[i]->m_obs_state.size();
         // cout << "size is " << size << endl;
         for (int j = 0; j < size-1; j++)

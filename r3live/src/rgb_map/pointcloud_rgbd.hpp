@@ -82,8 +82,10 @@ class RGB_pts
     int    m_N_rgb = 0;
     int    m_pt_index = 0;
 
-    int    m_label_state = 0;  // add
+    int    m_init_label_state = 0;  // add
+    bool   if_first_label = 1;  // add
     std::vector<int> m_obs_state;  // add
+    std::vector<int> m_obs_img_frame;  // add
 #endif
     vec_2      m_img_vel;
     vec_2      m_img_pt_in_last_frame;
@@ -109,8 +111,10 @@ class RGB_pts
         m_dbg_color = cv::Scalar( r, g, b );
         // m_rgb = vec_3(255, 255, 255);
 
-        m_label_state = 0; // add
+        m_init_label_state = 0;  // add
+        if_first_label = 1;  // add
         m_obs_state.clear();  // add
+        m_obs_img_frame.clear();  // add
     };
 
     RGB_pts()
