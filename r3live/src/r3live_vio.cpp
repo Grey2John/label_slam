@@ -401,7 +401,7 @@ int    total_frame_count = 0;
 void   R3LIVE::process_image( cv::Mat &temp_img, double msg_time )
 {
     cv::Mat img_get(temp_img.rows, temp_img.cols, CV_8UC3);
-    cv::Mat m_mask(temp_img.rows, temp_img.cols, CV_8UC1);
+    cv::Mat m_mask(temp_img.rows, temp_img.cols, CV_8UC1); // add
     if ( temp_img.rows == 0 )
     {
         cout << "Process image error, image rows =0 " << endl;
@@ -464,6 +464,8 @@ void   R3LIVE::process_image( cv::Mat &temp_img, double msg_time )
     img_pose->m_timestamp = msg_time;
     img_pose->init_cubic_interpolation();
     img_pose->image_equalize();
+    img_pose->m_cluster_map_matrix = cv::Mat::zeros(temp_img.rows/4, temp_img.cols/4, CV_8UC1); // add, downsampling
+    img_pose->m_cluster_map_index= cv::Mat::zeros(temp_img.rows/4, temp_img.cols/4, CV_8S); // add
     m_camera_data_mutex.lock();
     m_queue_image_with_pose.push_back( img_pose );
     m_camera_data_mutex.unlock();

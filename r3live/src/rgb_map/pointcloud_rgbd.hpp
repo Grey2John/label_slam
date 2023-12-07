@@ -84,8 +84,9 @@ class RGB_pts
 
     int    m_init_label_state = 0;  // add
     bool   if_first_label = 1;  // add
+    double  m_camera_coor_depth = 0;  // add
     std::vector<int> m_obs_state;  // add
-    std::vector<int> m_obs_img_frame;  // add
+    std::vector<int> m_obs_img_frame;  // add save the No of mask frame
 #endif
     vec_2      m_img_vel;
     vec_2      m_img_pt_in_last_frame;
@@ -113,6 +114,7 @@ class RGB_pts
 
         m_init_label_state = 0;  // add
         if_first_label = 1;  // add
+        m_camera_coor_depth = 0;  // add
         m_obs_state.clear();  // add
         m_obs_img_frame.clear();  // add
     };
@@ -166,7 +168,7 @@ struct Global_map
     int                                                          m_map_major_version = R3LIVE_MAP_MAJOR_VERSION;
     int                                                          m_map_minor_version = R3LIVE_MAP_MINOR_VERSION;
     int                                                          m_if_get_all_pts_in_boxes_using_mp = 1;
-    std::vector< RGB_pt_ptr >                    m_rgb_pts_vec;
+    std::vector< RGB_pt_ptr >                                    m_rgb_pts_vec;
     // std::vector< RGB_pt_ptr >                    m_rgb_pts_in_recent_visited_voxels;
     std::shared_ptr< std::vector< RGB_pt_ptr> >                  m_pts_rgb_vec_for_projection = nullptr;
     std::shared_ptr< std::mutex >                                m_mutex_pts_vec;
@@ -220,6 +222,79 @@ struct Global_map
     }
 };
 
+// add 
+class grid_unit  // add. for clustering
+{   
+    public:
+        double max_depth = 0;
+        double min_depth = 0;
+        bool point_state_list[7] = {0, 0, 0, 0, 0, 0, 0};  // 0, 1
+        int point_number[7] = {0, 0, 0, 0, 0, 0, 0};
+        int raw, col;
+        std::vector< RGB_pt_ptr > point_address_list;  // shared pointer
+
+        void       clear()
+        {
+            max_depth = 0;
+            min_depth = 0;
+            raw=0;
+            col=0;
+            point_address_list.clear();
+        };
+        grid_unit() { clear(); }
+        ~grid_unit() = default;
+        
+        // add
+        bool crack_region(int row, int col, cv::Mat cluster_map_matrix)
+        {
+            bool if_crack = 0;
+            // crack region detection, D8
+
+            return if_crack;
+        }
+        
+};
+using grid_unit_ptr = std::shared_ptr< grid_unit >;
+class ClusterCOOMap {  // add CSR sparse matrix
+    public:
+        int count = 0;
+        std::vector<int> row_indices_;
+        std::vector<int> col_indices_;
+        std::vector<std::array<int, 7>> class_number_;
+        std::vector<grid_unit_ptr> grid_ptr_;
+
+        // Constructor
+        ClusterCOOMap() {
+            clear();
+        }
+        ~ClusterCOOMap() = default;
+
+        void clear()
+        {
+            count = 0;
+            row_indices_.clear();
+            col_indices_.clear();
+            class_number_.clear();
+            grid_ptr_.clear();
+        }
+        // Add a non-zero element to the matrix
+        void addNewElement(int row, int col, int state, RGB_pt_ptr& point_ptr) {
+            row_indices_.push_back(row);
+            col_indices_.push_back(col);
+            std::array<int, 7> state_list = {0, 0, 0, 0, 0, 0, 0};
+            state_list[state] = 1;
+            class_number_.push_back(state_list);
+            grid_unit_ptr one_grid;
+            one_grid->point_address_list.push_back(point_ptr);
+            grid_ptr_.push_back(one_grid);
+
+            count += 1;
+        }
+        void configOldElement(int index, int state, RGB_pt_ptr& point_ptr) {
+            class_number_[index][state] += 1;
+            grid_ptr_[index]->point_address_list.push_back(point_ptr);
+        }
+};  
 
 void render_pts_in_voxels_mp( std::shared_ptr< Image_frame > &img_ptr, 
                                 std::unordered_set< RGB_voxel_ptr > *voxels_for_render, 
@@ -297,3 +372,36 @@ inline void load( Archive &ar, Global_map &global_map, const unsigned int /*vers
     cout << endl;
     cout << "Load offine global map cost: " << tim.toc() << " ms" << ANSI_COLOR_RESET << endl;
 }
+
+
+
+//add
+// class grid_group  //add, cluster region******************
+// {
+//   public:
+//     std::vector< grid_unit_ptr > m_grid_filters;
+//     double                    m_last_visited_time = 0;  // need change
+//     double max_depth = 0;
+//     double min_depth = 0;
+//     bool   is_devide = 0;  // judge if clustering
+
+//     grid_group() = default;
+//     ~grid_group() = default;
+//     void add_grid( grid_unit_ptr &grid_filter )  // foucs on state of 3, 4, 5
+//     { 
+//         max_depth = 0; // update the max depth
+//         point_number = 0; // update count
+
+//         m_grid_filters.push_back( grid_filter );  // control this vector
+//     }
+//     void judge_clustering(double threadhold)
+//     {
+//         if ((max_depth-min_depth) > threadhold)
+//         { is_devide=1 }
+//     }
+//     void clustering(double threadhold)  // analyze all points
+//     {
+        
+//     }
+// };
+// using grid_group_ptr = std::shared_ptr< grid_group >;  //add

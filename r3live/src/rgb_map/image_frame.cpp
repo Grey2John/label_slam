@@ -158,6 +158,37 @@ bool Image_frame::project_3d_to_2d(const pcl::PointXYZI & in_pt, Eigen::Matrix3d
     return true;
 }
 
+bool Image_frame::project_3d_to_2d(const pcl::PointXYZI & in_pt, Eigen::Matrix3d &cam_K, double &u, double &v, double &d, const double &scale)  //add
+{   
+    // reuse add the depth 
+    if (!m_if_have_set_pose)
+    {
+        cout << ANSI_COLOR_RED_BOLD << "You have not set the camera pose yet!" << ANSI_COLOR_RESET << endl;
+        // refresh_pose_for_projection();
+        while (1)
+        {};
+    }
+    if (m_if_have_set_intrinsic == 0)
+    {
+        cout << "You have not set the intrinsic yet!!!" << endl;
+        while (1)
+        {} ;
+        return false;
+    }
+
+    vec_3 pt_w(in_pt.x, in_pt.y, in_pt.z), pt_cam;
+    // pt_cam = (m_pose_w2c_q.inverse() * pt_w - m_pose_w2c_q.inverse()*m_pose_w2c_t);
+    pt_cam = (m_pose_c2w_q * pt_w + m_pose_c2w_t);
+    if (pt_cam(2) < 0.001)
+    {
+        return false;
+    }
+    u = (pt_cam(0) * fx / pt_cam(2) + cx) * scale; // x matrix zong
+    v = (pt_cam(1) * fy / pt_cam(2) + cy) * scale;  // y matrix heng
+    d = pt_cam(2);  // z in camera
+    return true;
+}
+
 bool Image_frame::if_2d_points_available(const double &u, const double &v, const double &scale, double fov_mar)
 {
     double used_fov_margin = m_fov_margin;
@@ -353,6 +384,35 @@ bool Image_frame::project_3d_point_in_this_img(const pcl::PointXYZI & in_pt, dou
     return true;
 }
 
+bool Image_frame::project_3d_point_in_this_img(const pcl::PointXYZI & in_pt, double &u, double &v, double &d, 
+                                                pcl::PointXYZRGB *rgb_pt, double intrinsic_scale)  // add
+{
+    if (project_3d_to_2d(in_pt, m_cam_K, u, v, d, intrinsic_scale) == false)
+    {
+        return false;
+    }
+    if (if_2d_points_available(u, v, intrinsic_scale) == false)
+    {
+        // printf_line;
+        return false;
+    }
+    if (rgb_pt != nullptr)
+    {
+        int r = 0;
+        int g = 0;
+        int b = 0;
+        get_rgb(u, v, r, g, b);
+        rgb_pt->x = in_pt.x;
+        rgb_pt->y = in_pt.y;
+        rgb_pt->z = in_pt.z;
+        rgb_pt->r = r;
+        rgb_pt->g = g;
+        rgb_pt->b = b;
+        rgb_pt->a = 255;
+    }
+    return true;
+}
+
 bool Image_frame::project_3d_point_in_this_img(const vec_3 & in_pt, double &u, double &v, pcl::PointXYZRGB *rgb_pt, double intrinsic_scale)
 {
     pcl::PointXYZI temp_pt;
@@ -360,6 +420,16 @@ bool Image_frame::project_3d_point_in_this_img(const vec_3 & in_pt, double &u, d
     temp_pt.y = in_pt(1);
     temp_pt.z = in_pt(2);
     return project_3d_point_in_this_img(temp_pt, u, v, rgb_pt, intrinsic_scale);
+}
+
+bool Image_frame::project_3d_point_in_this_img(const vec_3 & in_pt, double &u, double &v, double &d, 
+                                                pcl::PointXYZRGB *rgb_pt, double intrinsic_scale)  // add
+{
+    pcl::PointXYZI temp_pt;
+    temp_pt.x = in_pt(0);
+    temp_pt.y = in_pt(1);
+    temp_pt.z = in_pt(2);
+    return project_3d_point_in_this_img(temp_pt, u, v, d, rgb_pt, intrinsic_scale);
 }
 
 void Image_frame::dump_pose_and_image(const std::string name_prefix)

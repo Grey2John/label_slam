@@ -278,7 +278,10 @@ struct Image_frame
     cv::Mat m_raw_img;
     cv::Mat m_img_gray;
     cv::Mat m_mask_matrix;  // add, CV_8UC1 uchar type
-
+    cv::Mat m_cluster_map_matrix; // add  240x180 from 960x720, downsampling 
+    cv::Mat m_cluster_map_index; // add  240x180 from 960x720, downsampling 
+    // ClusterCOOMap m_sparse_cluster_map;  // add
+    
     double m_fov_margin = 0.005;
     
     Image_frame();   
@@ -292,6 +295,8 @@ struct Image_frame
     void inverse_pose();    
     void release_image();
     bool project_3d_to_2d( const pcl::PointXYZI & in_pt, Eigen::Matrix3d & cam_K, double &u, double &v, const double  & scale = 1.0);
+    bool project_3d_to_2d( const pcl::PointXYZI & in_pt, Eigen::Matrix3d & cam_K, 
+                            double &u, double &v, double &d, const double  & scale = 1.0);  // add
     bool if_2d_points_available(const double &u, const double &v, const double &scale = 1.0, double fov_mar = -1.0);
     vec_3 get_rgb(double &u, double v, int layer = 0, vec_3 *rgb_dx = nullptr, vec_3 *rgb_dy = nullptr);
     double get_grey_color(double & u ,double & v, int layer= 0 );
@@ -301,7 +306,11 @@ struct Image_frame
     void image_equalize(cv::Mat &img, int amp = 10.0);
     void image_equalize();
     bool project_3d_point_in_this_img(const pcl::PointXYZI & in_pt, double &u, double &v,   pcl::PointXYZRGB * rgb_pt = nullptr, double intrinsic_scale = 1.0);
+    bool project_3d_point_in_this_img(const pcl::PointXYZI & in_pt, double &u, double &v, double &d,  
+                                        pcl::PointXYZRGB * rgb_pt = nullptr, double intrinsic_scale = 1.0); // add
     bool project_3d_point_in_this_img(const vec_3 & in_pt, double &u, double &v, pcl::PointXYZRGB *rgb_pt = nullptr, double intrinsic_scale = 1.0);
+    bool project_3d_point_in_this_img(const vec_3 & in_pt, double &u, double &v, double &d, 
+                                        pcl::PointXYZRGB *rgb_pt = nullptr, double intrinsic_scale = 1.0);  //add
     void dump_pose_and_image( const std::string name_prefix );
     int load_pose_and_image( const std::string name_prefix, const double image_scale = 1.0, int if_load_image = 1 );
 

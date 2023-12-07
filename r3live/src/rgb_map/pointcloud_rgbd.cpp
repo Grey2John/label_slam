@@ -399,14 +399,18 @@ void Global_map::render_pts_in_voxels(std::shared_ptr<Image_frame> &img_ptr, std
 Common_tools::Cost_time_logger cost_time_logger_render("/home/ziv/temp/render_thr.log");
 
 std::atomic<long> render_pts_count ;
+int image_frame_count=0;  // add
+double cluster_scale = 4.0;  // add
 static inline double thread_render_pts_in_voxel(const int & pt_start, const int & pt_end, const std::shared_ptr<Image_frame> & img_ptr,
-                                                const std::vector<RGB_voxel_ptr> * voxels_for_render, const double obs_time)
+                                                const std::vector<RGB_voxel_ptr> * voxels_for_render, 
+                                                const double obs_time, ClusterCOOMap &sparse_cluster_map)
 {
     vec_3 pt_w;
     vec_3 rgb_color;
     double u, v;
+    double d_cam; // add, depth in camera coordination system
     double pt_cam_norm;
-    Mask_Pixel label_pixel; // add
+    Mask_Pixel label_pixel;  // add
     Common_tools::Timer tim;
     tim.tic();
     for (int voxel_idx = pt_start; voxel_idx < pt_end; voxel_idx++)
@@ -415,8 +419,9 @@ static inline double thread_render_pts_in_voxel(const int & pt_start, const int 
         RGB_voxel_ptr voxel_ptr = (*voxels_for_render)[ voxel_idx ];
         for ( int pt_idx = 0; pt_idx < voxel_ptr->m_pts_in_grid.size(); pt_idx++ )  // every point
         {
+            // cout << "get this place !!!!!!!!!!!!!!!!!!!!!!!!!!! : \n" << endl;
             pt_w = voxel_ptr->m_pts_in_grid[pt_idx]->get_pos();
-            if ( img_ptr->project_3d_point_in_this_img( pt_w, u, v, nullptr, 1.0 ) == false )   // important, get u, v
+            if ( img_ptr->project_3d_point_in_this_img( pt_w, u, v, d_cam, nullptr, 1.0 ) == false )   // important, get u, v // we changed
             {
                 continue;
             }
@@ -424,17 +429,33 @@ static inline double thread_render_pts_in_voxel(const int & pt_start, const int 
 
             label_pixel.clear_all();  // add
             img_ptr->get_mask_label_each_point(u, v, label_pixel);   // add, point label info is in the label_pixel
+            if (voxel_ptr->m_pts_in_grid[pt_idx]->if_first_label)  // add, this part can be in --- if(update_rgb) {}
+            {
+                voxel_ptr->m_pts_in_grid[pt_idx]->m_init_label_state = label_pixel.label_state;  
+                voxel_ptr->m_pts_in_grid[pt_idx]->if_first_label=0;
+            }
+            voxel_ptr->m_pts_in_grid[pt_idx]->m_obs_state.push_back(label_pixel.obs_state);  // add
+            // voxel_ptr->m_pts_in_grid[pt_idx]->m_obs_img_frame.push_back(image_frame_count);  // add frame recording
+            voxel_ptr->m_pts_in_grid[pt_idx]->m_camera_coor_depth = d_cam; // add update the point depth
+            
+            // add, data encording for clustering
+            int u_scale = static_cast<int>(u/cluster_scale);
+            int v_scale = static_cast<int>(v/cluster_scale);
+            if ( img_ptr->m_cluster_map_matrix.at<uchar>(u_scale, v_scale) == 1 ) {
+                sparse_cluster_map.configOldElement(img_ptr->m_cluster_map_index.at<char>(u_scale, v_scale), 
+                                                    label_pixel.obs_state, voxel_ptr->m_pts_in_grid[pt_idx] );
+            }
+            else {  // a new grid 
+                img_ptr->m_cluster_map_matrix.at<uchar>(u_scale, v_scale) = 1;
+                img_ptr->m_cluster_map_index.at<char>(u_scale, v_scale) = sparse_cluster_map.count;
+                sparse_cluster_map.addNewElement(u_scale, v_scale, label_pixel.obs_state, voxel_ptr->m_pts_in_grid[pt_idx] );
+            }
+
             // pts_for_render[i]->update_gray(gray, pt_cam_norm);
             rgb_color = img_ptr->get_rgb( u, v, 0 );
             if (  voxel_ptr->m_pts_in_grid[pt_idx]->update_rgb(
                      rgb_color, pt_cam_norm, vec_3( image_obs_cov, image_obs_cov, image_obs_cov ), obs_time ) )  // update point
             {
-                if (voxel_ptr->m_pts_in_grid[pt_idx]->if_first_label)  // add
-                {
-                    voxel_ptr->m_pts_in_grid[pt_idx]->m_init_label_state = label_pixel.label_state;  
-                    voxel_ptr->m_pts_in_grid[pt_idx]->if_first_label=0;
-                }
-                voxel_ptr->m_pts_in_grid[pt_idx]->m_obs_state.push_back(label_pixel.obs_state);  // add
                 render_pts_count++;
             }
         }
@@ -448,6 +469,8 @@ void render_pts_in_voxels_mp(std::shared_ptr<Image_frame> &img_ptr,
                             std::unordered_set<RGB_voxel_ptr> * _voxels_for_render,  
                             const double & obs_time )
 {
+    ClusterCOOMap m_sparse_cluster_map;  // add
+    image_frame_count += 1; // add frame adding 
     Common_tools::Timer tim;
     g_voxel_for_render.clear();
     for(Voxel_set_iterator it = (*_voxels_for_render).begin(); it != (*_voxels_for_render).end(); it++)
@@ -462,7 +485,7 @@ void render_pts_in_voxels_mp(std::shared_ptr<Image_frame> &img_ptr,
     if(USING_OPENCV_TBB)
     {
         cv::parallel_for_(cv::Range(0, numbers_of_voxels), [&](const cv::Range &r)
-                          { thread_render_pts_in_voxel(r.start, r.end, img_ptr, &g_voxel_for_render, obs_time); });
+                          { thread_render_pts_in_voxel(r.start, r.end, img_ptr, &g_voxel_for_render, obs_time, m_sparse_cluster_map); });
     }
     else
     {
@@ -475,7 +498,8 @@ void render_pts_in_voxels_mp(std::shared_ptr<Image_frame> &img_ptr,
             // cv::Range range(thr * pt_size / num_of_threads, (thr + 1) * pt_size / num_of_threads);
             int start = thr * numbers_of_voxels / num_of_threads;
             int end = (thr + 1) * numbers_of_voxels / num_of_threads;
-            results[thr] = m_thread_pool_ptr->commit_task(thread_render_pts_in_voxel, start, end,  img_ptr, &g_voxel_for_render, obs_time);
+            results[thr] = m_thread_pool_ptr->commit_task(thread_render_pts_in_voxel, start, end,  img_ptr, 
+                                                            &g_voxel_for_render, obs_time, m_sparse_cluster_map);
         }
         g_cost_time_logger.record(tim, "Com");
         tim.tic("wait_Opm");
@@ -675,7 +699,7 @@ void Global_map::save_pt_obs(std::string dir_name, std::string _file_name, int s
     std::string file_name = std::string(dir_name).append(_file_name);
     std::ofstream out_save_txt(std::string(file_name).append(".txt"));
     int num = 1;
-    for (long i = pt_size - 1; i > 0; i--)
+    for (long i = 0; i < pt_size; i++)
     {
         if (m_rgb_pts_vec[i]->m_obs_state.size() < save_pts_with_obs)
         {
@@ -696,8 +720,13 @@ void Global_map::save_pt_obs(std::string dir_name, std::string _file_name, int s
         {
             out_save_txt << m_rgb_pts_vec[i]->m_obs_state[j];
             out_save_txt << ", ";
+            // frame recording 
+            // out_save_txt << m_rgb_pts_vec[i]->m_obs_img_frame[j];
+            // out_save_txt << ", ";
         }
         out_save_txt << m_rgb_pts_vec[i]->m_obs_state[size - 1];
+        // out_save_txt << ", ";
+        // out_save_txt << m_rgb_pts_vec[i]->m_obs_img_frame[size - 1];
         out_save_txt << "\n";
         pt_count++;
     }
