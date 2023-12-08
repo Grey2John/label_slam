@@ -425,16 +425,24 @@ static inline double thread_render_pts_in_voxel(const int & pt_start, const int 
             label_pixel.clear_all();  // add
             img_ptr->get_mask_label_each_point(u, v, label_pixel);   // add, point label info is in the label_pixel
             // pts_for_render[i]->update_gray(gray, pt_cam_norm);
-            rgb_color = img_ptr->get_rgb( u, v, 0 );
-            if (  voxel_ptr->m_pts_in_grid[pt_idx]->update_rgb(
-                     rgb_color, pt_cam_norm, vec_3( image_obs_cov, image_obs_cov, image_obs_cov ), obs_time ) )  // update point
-            {
-                if (voxel_ptr->m_pts_in_grid[pt_idx]->if_first_label)  // add
+            if (voxel_ptr->m_pts_in_grid[pt_idx]->if_first_label)  // add
                 {
                     voxel_ptr->m_pts_in_grid[pt_idx]->m_init_label_state = label_pixel.label_state;  
                     voxel_ptr->m_pts_in_grid[pt_idx]->if_first_label=0;
                 }
-                voxel_ptr->m_pts_in_grid[pt_idx]->m_obs_state.push_back(label_pixel.obs_state);  // add
+            voxel_ptr->m_pts_in_grid[pt_idx]->m_obs_state.push_back(label_pixel.obs_state);  // add
+            voxel_ptr->m_pts_in_grid[pt_idx]->m_obs_img_frame.push_back(img_ptr->m_frame_idx);  // add frame recording
+
+            rgb_color = img_ptr->get_rgb( u, v, 0 );
+            if (  voxel_ptr->m_pts_in_grid[pt_idx]->update_rgb(
+                     rgb_color, pt_cam_norm, vec_3( image_obs_cov, image_obs_cov, image_obs_cov ), obs_time ) )  // update point
+            {
+                // if (voxel_ptr->m_pts_in_grid[pt_idx]->if_first_label)  // add
+                // {
+                //     voxel_ptr->m_pts_in_grid[pt_idx]->m_init_label_state = label_pixel.label_state;  
+                //     voxel_ptr->m_pts_in_grid[pt_idx]->if_first_label=0;
+                // }
+                // voxel_ptr->m_pts_in_grid[pt_idx]->m_obs_state.push_back(label_pixel.obs_state);  // add
                 render_pts_count++;
             }
         }
@@ -662,7 +670,8 @@ void Global_map::save_to_pcd(std::string dir_name, std::string _file_name, int s
     cout << "Save PCD cost time = " << tim.toc() << endl;
 }
 
-void Global_map::save_pt_obs(std::string dir_name, std::string _file_name, int save_pts_with_obs)  // add
+void Global_map::save_pt_obs(std::vector<ImagePoseRecord>& image_frame_pose_list, 
+                            std::string dir_name, std::string _file_name, int save_pts_with_obs)  // add
 {
     Common_tools::Timer tim;
     scope_color(ANSI_COLOR_GREEN_BOLD);
@@ -692,24 +701,41 @@ void Global_map::save_pt_obs(std::string dir_name, std::string _file_name, int s
         out_save_txt << m_rgb_pts_vec[i]->m_init_label_state << ", ";  // init label
         int size = m_rgb_pts_vec[i]->m_obs_state.size();
         // cout << "size is " << size << endl;
-        for (int j = 0; j < size-1; j++)
+        for (int j = 0; j < size-1; j++)   // add
         {
             out_save_txt << m_rgb_pts_vec[i]->m_obs_state[j];
             out_save_txt << ", ";
+            // frame recording 
+            out_save_txt << m_rgb_pts_vec[i]->m_obs_img_frame[j];
+            out_save_txt << ", ";
         }
         out_save_txt << m_rgb_pts_vec[i]->m_obs_state[size - 1];
+        out_save_txt << ", ";
+        out_save_txt << m_rgb_pts_vec[i]->m_obs_img_frame[size - 1];
         out_save_txt << "\n";
         pt_count++;
     }
     cout << "finally, we selet " << pt_count << " points" << endl;
     out_save_txt.close();
+
+    // add save image pose
+    std::string image_file_name = std::string(dir_name).append(_file_name+"_image_pose");
+    std::ofstream out_save_txt_image(std::string(image_file_name).append(".txt"));
+    for (size_t i = 0; i < image_frame_pose_list.size(); ++i)
+    {
+        image_frame_pose_list[i].tran_vector_to_string();
+        out_save_txt_image << image_frame_pose_list[i].s_image_pose;
+        out_save_txt_image << "\n";
+    }
+    out_save_txt_image.close();
     cout << "Save txt finished, cust time = " << tim.toc() << endl;
 }
 
-void Global_map::save_and_display_pointcloud(std::string dir_name, std::string file_name, int save_pts_with_views)
+void Global_map::save_and_display_pointcloud(std::vector<ImagePoseRecord>& image_frame_pose_list, 
+                        std::string dir_name, std::string file_name, int save_pts_with_views)
 {
     save_to_pcd(dir_name, file_name, save_pts_with_views);
-    save_pt_obs(dir_name, std::string("/pt_obs"), 2);  // add
+    save_pt_obs(image_frame_pose_list, dir_name, std::string("/pt_obs"), 2);  // add
     scope_color(ANSI_COLOR_WHITE_BOLD);
     cout << "========================================================" << endl;
     cout << "Open pcl_viewer to display point cloud, close the viewer's window to continue mapping process ^_^" << endl;

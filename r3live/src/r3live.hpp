@@ -245,6 +245,7 @@ public:
 
     int                          g_camera_frame_idx = 0;
     int                          g_LiDAR_frame_index = 0;
+    std::vector<ImagePoseRecord> image_frame_pose_list;  // add for recording, because the write func in Global_map
     std::mutex g_mutex_render;
     std::shared_ptr<Image_frame> g_last_image_pose_for_render = nullptr;
     std::list<double> frame_cost_time_vec;

@@ -246,6 +246,41 @@ struct Mask_Pixel  // add
                                                 {0, 1, 2}};
 };
 
+class ImagePoseRecord  // add
+{
+    public:
+        int frame_id=0;
+        eigen_q m_pose_c2w_q = eigen_q::Identity();
+        vec_3 m_pose_c2w_t = vec_3(0, 0, 0);  
+        std::string s_image_pose;
+
+        ImagePoseRecord(int frame, eigen_q q, vec_3 t)
+        {
+            frame_id=frame;
+            m_pose_c2w_q = q;
+            m_pose_c2w_t = t;  
+        }
+        ~ImagePoseRecord() = default;
+
+        void tran_vector_to_string()
+        {
+            s_image_pose = std::to_string(frame_id);
+            s_image_pose += ", ";
+
+            std::string ss_t;
+            for (size_t i = 0; i < m_pose_c2w_t.size(); ++i) {
+                ss_t += std::to_string(m_pose_c2w_t(i));
+                ss_t += ", ";
+            }
+            s_image_pose += ss_t;
+
+            s_image_pose += std::to_string(m_pose_c2w_q.w()) + ", " +
+                            std::to_string(m_pose_c2w_q.x()) + ", " +
+                            std::to_string(m_pose_c2w_q.y()) + ", " +
+                            std::to_string(m_pose_c2w_q.z());
+        }
+};
+
 struct Image_frame
 {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW

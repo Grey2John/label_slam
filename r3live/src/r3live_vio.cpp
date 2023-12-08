@@ -1128,7 +1128,8 @@ char R3LIVE::cv_keyboard_callback()
         cout << "I capture the keyboard input!!!" << endl;
         m_mvs_recorder.export_to_mvs( m_map_rgb_pts );
         // m_map_rgb_pts.save_and_display_pointcloud( m_map_output_dir, std::string("/rgb_pt"), std::max(m_pub_pt_minimum_views, 5) );
-        m_map_rgb_pts.save_and_display_pointcloud( m_map_output_dir, std::string("/rgb_pt"), m_pub_pt_minimum_views  );
+        m_map_rgb_pts.save_and_display_pointcloud( image_frame_pose_list, m_map_output_dir, 
+                                                    std::string("/rgb_pt"), m_pub_pt_minimum_views  );
     }
     return c;
 }
@@ -1247,6 +1248,10 @@ void R3LIVE::service_VIO_update()
         g_lio_state = state_out;
         print_dash_board();
         set_image_pose( img_pose, state_out );
+        ImagePoseRecord record_image_pose(img_pose->m_frame_idx,
+                                            img_pose->m_pose_c2w_q,
+                                            img_pose->m_pose_c2w_t); // add
+        image_frame_pose_list.push_back(record_image_pose); // add
 
         if ( 1 )
         {
