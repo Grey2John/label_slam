@@ -331,6 +331,7 @@ struct Image_frame
     vec_3 get_rgb(double &u, double v, int layer = 0, vec_3 *rgb_dx = nullptr, vec_3 *rgb_dy = nullptr);
     double get_grey_color(double & u ,double & v, int layer= 0 );
     bool get_mask_label_each_point(const double & u ,const double & v, Mask_Pixel & label_pixel);  // add
+
     bool get_rgb( const double & u,  const double & v, int & r, int & g, int & b  );
     void display_pose();
     void image_equalize(cv::Mat &img, int amp = 10.0);
