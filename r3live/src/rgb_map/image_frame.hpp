@@ -250,13 +250,15 @@ class ImagePoseRecord  // add
 {
     public:
         int frame_id=0;
+        int frame_seq;
         eigen_q m_pose_c2w_q = eigen_q::Identity();
         vec_3 m_pose_c2w_t = vec_3(0, 0, 0);  
         std::string s_image_pose;
 
-        ImagePoseRecord(int frame, eigen_q q, vec_3 t)
+        ImagePoseRecord(int frame, int seq, eigen_q q, vec_3 t)
         {
             frame_id=frame;
+            frame_seq=seq;
             m_pose_c2w_q = q;
             m_pose_c2w_t = t;  
         }
@@ -265,6 +267,8 @@ class ImagePoseRecord  // add
         void tran_vector_to_string()
         {
             s_image_pose = std::to_string(frame_id);
+            s_image_pose += ", ";
+            s_image_pose += std::to_string(frame_seq);
             s_image_pose += ", ";
 
             std::string ss_t;
@@ -303,6 +307,7 @@ struct Image_frame
     mat_3_3 m_pose_w2c_R;
     int m_img_rows = 0;
     int m_img_cols = 0;
+    int frame_seq; // add
     int m_frame_idx = 0;
     Eigen::Matrix<double, 2, 1> m_gama_para;
     // double m_downsample_step[MAX_DS_LAY] = {1.0, 0.5, 0.25 };

@@ -153,8 +153,8 @@ bool Image_frame::project_3d_to_2d(const pcl::PointXYZI & in_pt, Eigen::Matrix3d
     {
         return false;
     }
-    u = (pt_cam(0) * fx / pt_cam(2) + cx) * scale; // x matrix zong
-    v = (pt_cam(1) * fy / pt_cam(2) + cy) * scale;  // y matrix heng
+    u = (pt_cam(0) * fx / pt_cam(2) + cx) * scale; // x matrix heng W
+    v = (pt_cam(1) * fy / pt_cam(2) + cy) * scale;  // y matrix zong H
     return true;
 }
 

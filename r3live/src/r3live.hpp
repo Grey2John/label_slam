@@ -296,7 +296,7 @@ public:
                                           double * imu_camera_ext_R ,
                                           double * imu_camera_ext_t ,
                                           double cam_k_scale);
-    void process_image(cv::Mat & image, double msg_time);
+    void process_image(cv::Mat & image, double msg_time, int frame_seq );  // add
     void image_callback(const sensor_msgs::ImageConstPtr &msg);
     void image_comp_callback(const sensor_msgs::CompressedImageConstPtr &msg);
     // void image_mask_callback(const sensor_msgs::ImageConstPtr &msg);  // add

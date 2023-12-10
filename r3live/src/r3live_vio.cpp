@@ -280,7 +280,8 @@ void R3LIVE::service_process_img_buffer()
             }
         }
         cv::Mat image_get;
-        double  img_rec_time;
+        double  img_rec_time;    // add
+        int frame_seq;
         if ( sub_image_typed == 2 )
         {
             while ( g_received_compressed_img_msg.size() == 0 )
@@ -294,6 +295,7 @@ void R3LIVE::service_process_img_buffer()
             {
                 cv_bridge::CvImagePtr cv_ptr_compressed = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGR8 );
                 img_rec_time = msg->header.stamp.toSec();
+                frame_seq = msg->header.seq;   // add
                 image_get = cv_ptr_compressed->image;
                 cv_ptr_compressed->image.release();
             }
@@ -316,11 +318,12 @@ void R3LIVE::service_process_img_buffer()
             sensor_msgs::ImageConstPtr msg = g_received_img_msg.front();
             image_get = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGRA8 )->image.clone();  // modify
             img_rec_time = msg->header.stamp.toSec();
+            frame_seq = msg->header.seq;  // add
             mutex_image_callback.lock();
             g_received_img_msg.pop_front();
             mutex_image_callback.unlock();
         }
-        process_image( image_get, img_rec_time );
+        process_image( image_get, img_rec_time, frame_seq  );
     }
 }
 
@@ -358,7 +361,7 @@ void R3LIVE::image_callback( const sensor_msgs::ImageConstPtr &msg )
     }
 
     cv::Mat temp_img = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGRA8 )->image.clone();  // modify
-    process_image( temp_img, msg->header.stamp.toSec() );
+    process_image( temp_img, msg->header.stamp.toSec(), msg->header.seq );
 }
 
 // void R3LIVE::process_mask_buffer() // add
@@ -398,7 +401,7 @@ void R3LIVE::image_callback( const sensor_msgs::ImageConstPtr &msg )
 double last_accept_time = 0;
 int    buffer_max_frame = 0;
 int    total_frame_count = 0;
-void   R3LIVE::process_image( cv::Mat &temp_img, double msg_time )
+void   R3LIVE::process_image( cv::Mat &temp_img, double msg_time, int frame_seq )
 {
     cv::Mat img_get(temp_img.rows, temp_img.cols, CV_8UC3);
     cv::Mat m_mask(temp_img.rows, temp_img.cols, CV_8UC1);
@@ -462,6 +465,7 @@ void   R3LIVE::process_image( cv::Mat &temp_img, double msg_time )
     cv::remap( m_mask, img_pose->m_mask_matrix, m_ud_map1, m_ud_map2, cv::INTER_LINEAR );  // add undistort
     // cv::imshow("sub Img", img_pose->m_img);
     img_pose->m_timestamp = msg_time;
+    img_pose->frame_seq = frame_seq;  // add
     img_pose->init_cubic_interpolation();
     img_pose->image_equalize();
     m_camera_data_mutex.lock();
@@ -1249,6 +1253,7 @@ void R3LIVE::service_VIO_update()
         print_dash_board();
         set_image_pose( img_pose, state_out );
         ImagePoseRecord record_image_pose(img_pose->m_frame_idx,
+                                            img_pose->frame_seq,
                                             img_pose->m_pose_c2w_q,
                                             img_pose->m_pose_c2w_t); // add
         image_frame_pose_list.push_back(record_image_pose); // add
