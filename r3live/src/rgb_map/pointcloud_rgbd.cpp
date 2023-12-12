@@ -454,7 +454,7 @@ static inline double thread_render_pts_in_voxel(const int & pt_start, const int 
 std::vector<RGB_voxel_ptr>  g_voxel_for_render;
 void render_pts_in_voxels_mp(std::shared_ptr<Image_frame> &img_ptr, 
                             std::unordered_set<RGB_voxel_ptr> * _voxels_for_render,  
-                            const double & obs_time )
+                            const double & obs_time  )
 {
     Common_tools::Timer tim;
     g_voxel_for_render.clear();

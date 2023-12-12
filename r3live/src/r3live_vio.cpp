@@ -1228,7 +1228,6 @@ void R3LIVE::service_VIO_update()
             continue;
         }
         set_image_pose( img_pose, state_out );
-
         op_track.track_img( img_pose, -20 );
         g_cost_time_logger.record( tim, "Track_img" );
         // cout << "Track_img cost " << tim.toc( "Track_img" ) << endl;
@@ -1243,6 +1242,7 @@ void R3LIVE::service_VIO_update()
         g_cost_time_logger.record( tim, "Ransac" );
         tim.tic( "Vio_f2f" );
         bool res_esikf = true, res_photometric = true;
+        ImagePoseRecord record_image_pose;  // add
         wait_render_thread_finish();
         res_esikf = vio_esikf( state_out, op_track );
         g_cost_time_logger.record( tim, "Vio_f2f" );
@@ -1252,12 +1252,6 @@ void R3LIVE::service_VIO_update()
         g_lio_state = state_out;
         print_dash_board();
         set_image_pose( img_pose, state_out );
-        ImagePoseRecord record_image_pose(img_pose->m_frame_idx,
-                                            img_pose->frame_seq,
-                                            img_pose->m_pose_c2w_q,
-                                            img_pose->m_pose_c2w_t); // add
-        image_frame_pose_list.push_back(record_image_pose); // add
-
         if ( 1 )
         {
             tim.tic( "Render" );
@@ -1267,6 +1261,10 @@ void R3LIVE::service_VIO_update()
                 m_map_rgb_pts.m_if_get_all_pts_in_boxes_using_mp = 0;
                 // m_map_rgb_pts.render_pts_in_voxels_mp(img_pose, &m_map_rgb_pts.m_rgb_pts_in_recent_visited_voxels,
                 // img_pose->m_timestamp);
+                record_image_pose.record(img_pose->m_frame_idx, img_pose->frame_seq,
+                                                img_pose->m_pose_c2w_q, img_pose->m_pose_c2w_t,
+                                                img_pose->fx, img_pose->fy, img_pose->cx, img_pose->cy);  //add
+                image_frame_pose_list.push_back(record_image_pose); // add
                 m_render_thread = std::make_shared< std::shared_future< void > >( m_thread_pool_ptr->commit_task(
                     render_pts_in_voxels_mp, img_pose, &m_map_rgb_pts.m_voxels_recent_visited, img_pose->m_timestamp  ) );
             }

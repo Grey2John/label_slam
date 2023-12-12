@@ -251,18 +251,27 @@ class ImagePoseRecord  // add
     public:
         int frame_id=0;
         int frame_seq;
+        double fx, fy, cx, cy;
         eigen_q m_pose_c2w_q = eigen_q::Identity();
         vec_3 m_pose_c2w_t = vec_3(0, 0, 0);  
         std::string s_image_pose;
 
-        ImagePoseRecord(int frame, int seq, eigen_q q, vec_3 t)
+
+        ImagePoseRecord() = default;
+        ~ImagePoseRecord() = default;
+
+        void record(int frame, int seq, eigen_q q, vec_3 t,
+                    double fx_, double fy_, double cx_, double cy_)
         {
             frame_id=frame;
             frame_seq=seq;
             m_pose_c2w_q = q;
             m_pose_c2w_t = t;  
+            fx = fx_;
+            fy = fy_;
+            cx = cx_;
+            cy = cy_;
         }
-        ~ImagePoseRecord() = default;
 
         void tran_vector_to_string()
         {
@@ -278,10 +287,15 @@ class ImagePoseRecord  // add
             }
             s_image_pose += ss_t;
 
-            s_image_pose += std::to_string(m_pose_c2w_q.w()) + ", " +
-                            std::to_string(m_pose_c2w_q.x()) + ", " +
+            s_image_pose += std::to_string(m_pose_c2w_q.x()) + ", " +
                             std::to_string(m_pose_c2w_q.y()) + ", " +
-                            std::to_string(m_pose_c2w_q.z());
+                            std::to_string(m_pose_c2w_q.z()) + ", " +
+                            std::to_string(m_pose_c2w_q.w()) + ", ";
+
+            s_image_pose += std::to_string(fx) + ", " +
+                            std::to_string(fy) + ", " +
+                            std::to_string(cx) + ", " +
+                            std::to_string(cy);
         }
 };
 
